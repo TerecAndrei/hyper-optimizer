@@ -5,7 +5,7 @@ use std::{env::var, fs::File, marker::PhantomData, path::Path, time::Duration};
 use crate::config::RandomSearchConfig;
 use crate::library::{Domain, InputDataExt};
 use crate::output::{BayesianOptimizationExtraFields, Evaluation, MethodType, OutputStats};
-use crate::runners::{Config, RunnerMinimizer, RunnerResult};
+use crate::runners::{Config, OptimizerResult, RunnerMinimizer};
 use crate::{
     config::BayesianSearchConfig,
     library::{DomainBuilder, InputData, InputDeserializer, InputRunner, Value},
@@ -22,12 +22,12 @@ use optimize::Minimizer;
 use rand::{thread_rng, Rng, SeedableRng};
 use serde::Serialize;
 
-pub struct TestRunner<R: InputRunner<Data>, Data: InputData> {
+pub struct Optimizer<R: InputRunner<Data>, Data: InputData> {
     runner: R,
     _phantom_data: PhantomData<Data>,
 }
 
-impl<R: InputRunner<Data>, Data: InputData> TestRunner<R, Data> {
+impl<R: InputRunner<Data>, Data: InputData> Optimizer<R, Data> {
     pub fn new(runner: R) -> Self {
         Self {
             _phantom_data: PhantomData,
@@ -35,11 +35,11 @@ impl<R: InputRunner<Data>, Data: InputData> TestRunner<R, Data> {
         }
     }
 
-    pub fn some_other_way<Minimizer: RunnerMinimizer<R, Data>>(
+    pub fn optimize<Minimizer: RunnerMinimizer<R, Data>>(
         &self,
         config: &Config,
         minimizer: &Minimizer,
-    ) -> RunnerResult<Data> {
+    ) -> OptimizerResult<Data> {
         let (domains, names) = Data::get_domains_and_names();
         if let Some(ref last_stats) = config.last_evaluations {
             if domains.len() != last_stats.domains.len() {
@@ -104,7 +104,7 @@ impl<R: InputRunner<Data>, Data: InputData> TestRunner<R, Data> {
         if let Some(ref path) = config.path {
             self.save(&stats, path);
         }
-        RunnerResult {
+        OptimizerResult {
             best_input,
             best_output,
             stats,

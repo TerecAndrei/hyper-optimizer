@@ -7,7 +7,7 @@ use crate::{
 
 use super::RunnerMinimizer;
 
-pub struct ComposedRunner<F, S, Runner, Data>
+pub struct ComposedRunnerMinimizer<F, S, Runner, Data>
 where
     F: RunnerMinimizer<Runner, Data> + Sized,
     S: RunnerMinimizer<Runner, Data> + Sized,
@@ -20,7 +20,7 @@ where
     _data_phantom_data: PhantomData<Data>,
 }
 
-impl<F, S, Runner, Data> ComposedRunner<F, S, Runner, Data>
+impl<F, S, Runner, Data> ComposedRunnerMinimizer<F, S, Runner, Data>
 where
     F: RunnerMinimizer<Runner, Data>,
     S: RunnerMinimizer<Runner, Data>,
@@ -37,7 +37,8 @@ where
     }
 }
 
-impl<F, S, Runner, Data> RunnerMinimizer<Runner, Data> for ComposedRunner<F, S, Runner, Data>
+impl<F, S, Runner, Data> RunnerMinimizer<Runner, Data>
+    for ComposedRunnerMinimizer<F, S, Runner, Data>
 where
     F: RunnerMinimizer<Runner, Data>,
     S: RunnerMinimizer<Runner, Data>,

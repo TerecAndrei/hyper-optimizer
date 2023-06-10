@@ -8,11 +8,11 @@ use crate::{
 };
 
 use super::RunnerMinimizer;
-pub struct FixedRunner {
+pub struct FixedRunnerMinimizer {
     points: Vec<Vec<Value>>,
 }
 
-impl FixedRunner {
+impl FixedRunnerMinimizer {
     pub fn new(evaluations: impl IntoIterator<Item = Vec<Value>>) -> Self {
         Self {
             points: evaluations.into_iter().collect(),
@@ -20,7 +20,7 @@ impl FixedRunner {
     }
 }
 
-impl<Runner, Data> RunnerMinimizer<Runner, Data> for FixedRunner
+impl<Runner, Data> RunnerMinimizer<Runner, Data> for FixedRunnerMinimizer
 where
     Runner: InputRunner<Data>,
     Data: InputData + 'static,

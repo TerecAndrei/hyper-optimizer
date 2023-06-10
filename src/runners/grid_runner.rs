@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{
     library::{Domain, InputData, InputDataExt, InputRunner, Value},
     output::Evaluation,
@@ -44,17 +42,17 @@ impl From<Vec<usize>> for GridRunnerStep {
     }
 }
 
-pub struct GridRunner {
+pub struct GridRunnerMinimizer {
     step: GridRunnerStep,
 }
 
-impl GridRunner {
+impl GridRunnerMinimizer {
     pub fn new(step: impl Into<GridRunnerStep>) -> Self {
         Self { step: step.into() }
     }
 }
 
-impl<Runner, Data> RunnerMinimizer<Runner, Data> for GridRunner
+impl<Runner, Data> RunnerMinimizer<Runner, Data> for GridRunnerMinimizer
 where
     Runner: InputRunner<Data>,
     Data: InputData + 'static,

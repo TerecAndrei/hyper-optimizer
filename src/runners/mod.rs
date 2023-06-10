@@ -2,8 +2,10 @@ pub mod bayesian_runner;
 // pub mod boxed_runner;
 pub mod composed_runner;
 pub mod fixed_runner;
+pub mod genetic_runner;
 pub mod grid_runner;
 pub mod random_runner;
+
 use std::fs::File;
 
 use crate::{
@@ -11,7 +13,7 @@ use crate::{
     output::{Evaluation, OutputStats},
 };
 
-use self::composed_runner::ComposedRunner;
+use self::composed_runner::ComposedRunnerMinimizer;
 pub trait RunnerMinimizer<Runner, Data>
 where
     Runner: InputRunner<Data>,
@@ -38,7 +40,7 @@ where
     Runner: InputRunner<Data>,
     Data: InputData,
 {
-    fn merge<T>(self, other: T) -> ComposedRunner<Self, T, Runner, Data>
+    fn merge<T>(self, other: T) -> ComposedRunnerMinimizer<Self, T, Runner, Data>
     where
         T: RunnerMinimizer<Runner, Data> + Sized;
 }
@@ -49,11 +51,11 @@ where
     Data: InputData,
     RMinimizer: RunnerMinimizer<Runner, Data>,
 {
-    fn merge<T>(self, other: T) -> ComposedRunner<Self, T, Runner, Data>
+    fn merge<T>(self, other: T) -> ComposedRunnerMinimizer<Self, T, Runner, Data>
     where
         T: RunnerMinimizer<Runner, Data> + Sized,
     {
-        ComposedRunner::new(self, other)
+        ComposedRunnerMinimizer::new(self, other)
     }
 }
 
@@ -86,8 +88,8 @@ impl ConfigBuilder {
         }
     }
 
-    pub fn save_interval(mut self, interval: Option<u32>) -> Self {
-        self.save_interval = interval;
+    pub fn save_interval(mut self, interval: u32) -> Self {
+        self.save_interval = Some(interval);
         self
     }
 
@@ -96,12 +98,12 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn different_domains(mut self, allow_different_domains: bool) -> Self {
+    pub fn allow_different_domains(mut self, allow_different_domains: bool) -> Self {
         self.allow_different_domains = allow_different_domains;
         self
     }
 
-    pub fn different_names(mut self, allow_different_names: bool) -> Self {
+    pub fn allow_different_names(mut self, allow_different_names: bool) -> Self {
         self.allow_different_names = allow_different_names;
         self
     }
@@ -132,7 +134,7 @@ impl ConfigBuilder {
     }
 }
 
-pub struct RunnerResult<Data: InputData> {
+pub struct OptimizerResult<Data: InputData> {
     pub best_input: Data,
     pub best_output: f64,
     pub stats: OutputStats,

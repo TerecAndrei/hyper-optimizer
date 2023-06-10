@@ -14,28 +14,28 @@ use crate::{
 
 use super::RunnerMinimizer;
 
-pub struct BayesianRunner {
+pub struct BayesianRunnerMinimizer {
     buget: u64,
     initial_k: f64,
 }
 
-impl BayesianRunner {
+impl BayesianRunnerMinimizer {
     pub fn new(buget: u64) -> Self {
-        BayesianRunner {
+        BayesianRunnerMinimizer {
             buget,
             initial_k: 2.,
         }
     }
 
     pub fn new_with_options(budget: u64, initial_k: f64) -> Self {
-        BayesianRunner {
+        BayesianRunnerMinimizer {
             buget: budget,
             initial_k,
         }
     }
 }
 
-impl<Runner, Data> RunnerMinimizer<Runner, Data> for BayesianRunner
+impl<Runner, Data> RunnerMinimizer<Runner, Data> for BayesianRunnerMinimizer
 where
     Runner: InputRunner<Data>,
     Data: InputData + 'static,
@@ -83,7 +83,7 @@ where
     R: InputRunner<Data>,
     Data: InputData,
 {
-    fn new<IE>(bayesian: &BayesianRunner, runner: &'a R, evaluations: IE) -> Self
+    fn new<IE>(bayesian: &BayesianRunnerMinimizer, runner: &'a R, evaluations: IE) -> Self
     where
         IE: Iterator<Item = Evaluation> + Clone + 'a,
     {
