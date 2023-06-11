@@ -1,12 +1,12 @@
 pub mod bayesian_runner;
-// pub mod boxed_runner;
+pub mod boxed_runner;
 pub mod composed_runner;
 pub mod fixed_runner;
 pub mod genetic_runner;
 pub mod grid_runner;
 pub mod random_runner;
 
-use std::fs::File;
+use std::{fs::File, path::Path};
 
 use crate::{
     library::{InputData, InputRunner, Value},
@@ -59,20 +59,55 @@ where
     }
 }
 
-pub struct Config {
+pub trait SaveTrait {
+    fn save(&mut self, stats: &OutputStats, iteration: usize);
+}
+
+impl<Function> SaveTrait for Function
+where
+    Function: FnMut(&OutputStats, usize),
+{
+    fn save(&mut self, stats: &OutputStats, iteration: usize) {
+        self(stats, iteration)
+    }
+}
+
+pub struct Config<SaveFn>
+where
+    SaveFn: SaveTrait,
+{
     pub(crate) save_interval: Option<u32>,
     pub(crate) last_evaluations: Option<OutputStats>,
     pub(crate) allow_different_domains: bool,
     pub(crate) allow_different_names: bool,
-    pub(crate) path: Option<String>,
+    pub(crate) save_fn: SaveFn,
 }
 
-pub struct ConfigBuilder {
+pub struct EmptySave;
+
+impl SaveTrait for EmptySave {
+    fn save(&mut self, _stats: &OutputStats, _iteration: usize) {}
+}
+
+pub struct SaveToFile<P: AsRef<Path>> {
+    path: P,
+}
+
+impl<P: AsRef<Path>> SaveTrait for SaveToFile<P> {
+    fn save(&mut self, stats: &OutputStats, _iteration: usize) {
+        stats.write_to_file(self.path.as_ref())
+    }
+}
+
+pub struct ConfigBuilder<SaveFn = EmptySave>
+where
+    SaveFn: SaveTrait,
+{
     save_interval: Option<u32>,
     prior_evaluations: Option<OutputStats>,
     allow_different_domains: bool,
     allow_different_names: bool,
-    output_path: Option<String>,
+    save_fn: SaveFn,
     read_evaluations_from: Option<String>,
 }
 
@@ -83,11 +118,13 @@ impl ConfigBuilder {
             prior_evaluations: None,
             allow_different_domains: false,
             allow_different_names: false,
-            output_path: None,
+            save_fn: EmptySave,
             read_evaluations_from: None,
         }
     }
+}
 
+impl<SafeFn: SaveTrait> ConfigBuilder<SafeFn> {
     pub fn save_interval(mut self, interval: u32) -> Self {
         self.save_interval = Some(interval);
         self
@@ -113,12 +150,29 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn output(mut self, path: String) -> Self {
-        self.output_path = Some(path);
-        self
+    pub fn output<P: AsRef<Path>>(self, path: P) -> ConfigBuilder<SaveToFile<P>> {
+        ConfigBuilder {
+            allow_different_domains: self.allow_different_domains,
+            allow_different_names: self.allow_different_names,
+            prior_evaluations: self.prior_evaluations,
+            read_evaluations_from: self.read_evaluations_from,
+            save_interval: self.save_interval,
+            save_fn: SaveToFile { path },
+        }
     }
 
-    pub fn build(self) -> Config {
+    pub fn on_save<NewSaveFn: SaveTrait>(self, save_fn: NewSaveFn) -> ConfigBuilder<NewSaveFn> {
+        ConfigBuilder {
+            allow_different_domains: self.allow_different_domains,
+            allow_different_names: self.allow_different_names,
+            prior_evaluations: self.prior_evaluations,
+            read_evaluations_from: self.read_evaluations_from,
+            save_interval: self.save_interval,
+            save_fn,
+        }
+    }
+
+    pub fn build(self) -> Config<SafeFn> {
         let mut prior_evaluations = self.prior_evaluations;
         if let Some(path) = self.read_evaluations_from {
             let file = File::open(path).unwrap();
@@ -129,7 +183,7 @@ impl ConfigBuilder {
             last_evaluations: prior_evaluations,
             allow_different_domains: self.allow_different_domains,
             allow_different_names: self.allow_different_names,
-            path: self.output_path,
+            save_fn: self.save_fn,
         }
     }
 }

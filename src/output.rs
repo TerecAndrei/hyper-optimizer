@@ -1,8 +1,10 @@
+use std::{fs::File, path::Path};
+
 use serde::{Deserialize, Serialize};
 
 use crate::library::{Domain, InputData, InputDataExt};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputStats {
     // pub method_type: MethodType,
@@ -18,16 +20,16 @@ impl OutputStats {
             .min_by(|a, b| a.output.total_cmp(&b.output))
             .map(|e| (Data::from_f64(e.input.iter().cloned()), e.output))
     }
-}
 
-#[derive(Serialize)]
-#[serde(tag = "methodType", content = "extra")]
-#[serde(rename_all = "camelCase")]
-pub enum MethodType {
-    BayesianOptimization(BayesianOptimizationExtraFields),
-    RandomSearch,
-    GridSearch(GridSearchExtraFields),
-    GeneticAlgorithm(GeneticAlgorithmExtraFields),
+    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) {
+        let writer = File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(path)
+            .unwrap();
+        serde_json::to_writer_pretty(writer, self).unwrap();
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -35,17 +37,3 @@ pub struct Evaluation {
     pub input: Vec<f64>,
     pub output: f64,
 }
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BayesianOptimizationExtraFields {
-    pub initial_sample: u64,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GridSearchExtraFields {}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GeneticAlgorithmExtraFields {}

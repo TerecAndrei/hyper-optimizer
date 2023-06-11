@@ -1,4 +1,4 @@
-use std::ops::{Bound, Range, RangeBounds};
+use std::ops::Range;
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -173,27 +173,5 @@ where
 {
     fn run(&self, data: Data) -> f64 {
         self(data)
-    }
-}
-
-pub fn test_runner<R: InputRunner<Data>, Data: InputData>(r: R) {
-    let domains = Data::get_domains(DomainBuilder::new()).into_inner().0;
-
-    for _ in 0..100 {
-        let data = domains
-            .iter()
-            .map(|d| {
-                let mut r = rand::thread_rng();
-                match d.clone() {
-                    Domain::Continuos(range) => Value::Float(r.gen_range(range)),
-                    Domain::Discrete(range) => Value::Integer(r.gen_range(range)),
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let data = Data::from_deserializer(InputDeserializer {
-            values: data.into_iter(),
-        });
-        let _output = r.run(data);
     }
 }

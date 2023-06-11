@@ -1,7 +1,3 @@
-use std::collections::HashSet;
-
-use rand::thread_rng;
-
 use crate::{
     library::{InputData, InputDataExt, InputRunner, Value},
     output::Evaluation,

@@ -23,7 +23,7 @@ impl BayesianRunnerMinimizer {
     pub fn new(buget: u64) -> Self {
         BayesianRunnerMinimizer {
             buget,
-            initial_k: 2.,
+            initial_k: 3.,
         }
     }
 
@@ -96,7 +96,7 @@ where
             })
             .unzip();
 
-        let mut gp = friedrich::gaussian_process::GaussianProcessBuilder::<
+        let gp = friedrich::gaussian_process::GaussianProcessBuilder::<
             SquaredExp,
             friedrich::prior::ConstantPrior,
         >::new(training_inputs, training_outputs)
@@ -147,7 +147,7 @@ where
         }
     }
 
-    fn get_next_guess(&mut self) -> Box<[f64]> {
+    fn get_next_guess(&mut self) -> Option<Box<[f64]>> {
         let mut retries = 0;
         let result = loop {
             let minim_function = |input: &[f64]| {
@@ -170,7 +170,7 @@ where
                 .last_guess
                 .iter()
                 .zip(next_guess.iter())
-                .all(|(x, y)| x == y)
+                .all(|(x, y)| (x - y).abs() < 0.000001)
             {
                 log::warn!(
                     "Last guess identical to this guess. make k larger by 1.5. {:?}, {:?}",
@@ -179,30 +179,21 @@ where
                 );
                 self.k *= 1.5;
                 retries += 1;
-                if retries < 2 {
-                    continue;
-                }
                 if retries < 3 {
-                    log::warn!("Retried for the 3 time. Fitting the model");
-                    self.gp
-                        .fit_parameters(true, true, 100, 0.05, Duration::from_secs(3600));
-                    log::error!("{}", self.gp.noise);
-                    log::error!("{:?}", self.gp.cholesky_epsilon);
-                    if self.gp.noise < 0.1 || self.gp.noise.is_nan() {
-                        self.gp.noise = 0.1
-                    }
-                    self.gp.cholesky_epsilon = Some(self.gp.noise.powi(2));
                     continue;
                 }
-                log::warn!("Retried for 3 times. We are letting the function be evaluated again");
+                log::warn!("Retried for 3 times. Quiting");
+                self.buget_remaining = 0;
+                return None;
             }
             self.last_guess = next_guess.to_vec();
             break next_guess;
         };
         // self.gp
-        //     .fit_parameters(true, true, 100, 0.05, Duration::from_secs(3600));
+        //     .fit_parameters(true, true, 100, 0.01, Duration::from_secs(1));
+
         log::error!("noise={}", self.gp.noise);
-        result
+        Some(result)
     }
 }
 
@@ -216,7 +207,7 @@ where
         if self.buget_remaining == 0 {
             return None;
         }
-        let next_guess = self.get_next_guess();
+        let next_guess = self.get_next_guess()?;
         let next_guess = next_guess.to_vec();
 
         let input = next_guess
@@ -253,7 +244,7 @@ where
 
 #[inline]
 fn is_integer(value: f64) -> bool {
-    (value.round() - value).abs() < 0.05
+    (value.round() - value).abs() < 0.00001
 }
 
 fn normalize_input(inputs: &mut Vec<f64>, domains: &[Domain]) {

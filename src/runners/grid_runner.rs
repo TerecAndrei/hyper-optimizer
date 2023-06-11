@@ -125,6 +125,19 @@ where
     }
 
     fn buget(&self) -> u64 {
-        0
+        let domains = Data::get_domains_ext();
+        let all_steps = self.step.get_steps_size(&domains);
+        let size = all_steps
+            .into_iter()
+            .map(|steps| {
+                let steps = steps - 1;
+                if steps == 0 {
+                    1
+                } else {
+                    (steps + 1) as u64
+                }
+            })
+            .product::<u64>();
+        size
     }
 }
