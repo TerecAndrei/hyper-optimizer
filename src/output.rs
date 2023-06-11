@@ -21,6 +21,12 @@ impl OutputStats {
             .map(|e| (Data::from_f64(e.input.iter().cloned()), e.output))
     }
 
+    pub fn read_from_file<P: AsRef<Path>>(path: P) -> OutputStats {
+        let file = File::open(path).unwrap();
+
+        serde_json::from_reader(file).unwrap()
+    }
+
     pub fn write_to_file<P: AsRef<Path>>(&self, path: P) {
         let writer = File::options()
             .write(true)
@@ -36,4 +42,19 @@ impl OutputStats {
 pub struct Evaluation {
     pub input: Vec<f64>,
     pub output: f64,
+}
+
+impl Evaluation {
+    pub fn input_to_data<Data: InputData>(&self) -> Data {
+        let domains = Data::get_domains_ext();
+        Data::from_values(
+            self.input
+                .iter()
+                .zip(domains)
+                .map(|(input, domain)| match domain {
+                    Domain::Continuos(_) => crate::library::Value::Float(*input),
+                    Domain::Discrete(_) => crate::library::Value::Integer(*input as i32),
+                }),
+        )
+    }
 }

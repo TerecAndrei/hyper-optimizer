@@ -189,10 +189,9 @@ where
             self.last_guess = next_guess.to_vec();
             break next_guess;
         };
-        // self.gp
-        //     .fit_parameters(true, true, 100, 0.01, Duration::from_secs(1));
+        self.gp
+            .fit_parameters(true, true, 100, 0.01, Duration::from_secs(1));
 
-        log::error!("noise={}", self.gp.noise);
         Some(result)
     }
 }
