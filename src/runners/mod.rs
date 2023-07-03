@@ -1,5 +1,4 @@
 pub mod bayesian_runner;
-pub mod boxed_runner;
 pub mod composed_runner;
 pub mod fixed_runner;
 pub mod genetic_runner;

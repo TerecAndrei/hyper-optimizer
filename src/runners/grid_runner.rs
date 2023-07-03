@@ -114,7 +114,8 @@ where
                 };
                 result
             })
-            .multi_cartesian_product();
+            .multi_cartesian_product()
+            .fuse();
 
         let iterator = r.map(|v| {
             let data = Data::from_values(v.iter().cloned());

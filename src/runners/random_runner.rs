@@ -1,4 +1,4 @@
-use rand::thread_rng;
+use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 use crate::{
     library::{InputData, InputDataExt, InputRunner, Value},
@@ -6,17 +6,27 @@ use crate::{
 };
 
 use super::RunnerMinimizer;
-pub struct RandomRunner {
+pub struct RandomRunner<R: Rng + Clone = ThreadRng> {
     buget: u64,
+    rng: R,
 }
 
 impl RandomRunner {
     pub fn new(buget: u64) -> Self {
-        Self { buget }
+        Self {
+            buget,
+            rng: thread_rng(),
+        }
     }
 }
 
-impl<Runner, Data> RunnerMinimizer<Runner, Data> for RandomRunner
+impl<R: Rng + Clone> RandomRunner<R> {
+    pub fn new_with_rng(buget: u64, rng: R) -> Self {
+        Self { buget, rng }
+    }
+}
+
+impl<Runner, Data, R: Rng + Clone> RunnerMinimizer<Runner, Data> for RandomRunner<R>
 where
     Runner: InputRunner<Data>,
     Data: InputData + 'static,
@@ -31,7 +41,7 @@ where
         IE: Iterator<Item = Evaluation> + Clone + 'a,
     {
         let domains = Data::get_domains_ext();
-        let mut rng = thread_rng();
+        let mut rng = self.rng.clone();
 
         let iterator = (0..self.buget).map(move |_| {
             let data = domains

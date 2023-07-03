@@ -3,9 +3,8 @@ use std::{marker::PhantomData, time::Duration};
 use friedrich::{
     gaussian_process::GaussianProcess,
     kernel::{Kernel, SquaredExp},
-    prior::{ConstantPrior, Prior},
+    prior::Prior,
 };
-use rand::thread_rng;
 
 use crate::{
     library::{Domain, InputData, InputDataExt, InputRunner, Value},
@@ -14,23 +13,41 @@ use crate::{
 
 use super::RunnerMinimizer;
 
+pub struct BayesianRunnerConfig {
+    pub initial_k: f64,
+    pub fit_model_after: Option<u64>,
+}
+
+impl Default for BayesianRunnerConfig {
+    fn default() -> Self {
+        Self {
+            initial_k: 2.,
+            fit_model_after: None,
+        }
+    }
+}
+
 pub struct BayesianRunnerMinimizer {
     buget: u64,
     initial_k: f64,
+    /// after how many iterations should I refit the gp
+    fit_model_after: Option<u64>,
 }
 
 impl BayesianRunnerMinimizer {
     pub fn new(buget: u64) -> Self {
         BayesianRunnerMinimizer {
             buget,
-            initial_k: 3.,
+            initial_k: 2.,
+            fit_model_after: None,
         }
     }
 
-    pub fn new_with_options(budget: u64, initial_k: f64) -> Self {
+    pub fn new_with_options(budget: u64, config: BayesianRunnerConfig) -> Self {
         BayesianRunnerMinimizer {
             buget: budget,
-            initial_k,
+            initial_k: config.initial_k,
+            fit_model_after: config.fit_model_after,
         }
     }
 }
@@ -66,16 +83,43 @@ where
     R: InputRunner<Data>,
     Data: InputData,
 {
-    gp: GaussianProcess<SquaredExp, ConstantPrior>,
+    gp: GaussianProcessType,
     runner: &'a R,
     buget_remaining: u64,
-    k: f64,
+    initial_k: f64,
+    fit_model_after: Option<u64>,
+    current_iteration: u64,
     discrete_domains_index: Vec<usize>,
     nb_iterations: usize,
     input_interval: Vec<(f64, f64)>,
     last_guess: Vec<f64>,
     domains: Vec<Domain>,
     _phantom_data: PhantomData<Data>,
+    inputs: Vec<Vec<f64>>,
+    outputs: Vec<f64>,
+}
+
+type GaussianProcessType =
+    friedrich::gaussian_process::GaussianProcess<SquaredExp, friedrich::prior::ConstantPrior>;
+
+fn create_gaussian_process(
+    mut inputs: Vec<Vec<f64>>,
+    domains: &[Domain],
+    outputs: Vec<f64>,
+) -> GaussianProcessType {
+    for input in inputs.iter_mut() {
+        normalize_input(input, domains);
+    }
+    let gp = friedrich::gaussian_process::GaussianProcessBuilder::<
+        SquaredExp,
+        friedrich::prior::ConstantPrior,
+    >::new(inputs, outputs)
+    // .set_cholesky_epsilon(Some(0.01f64.powi(2)))
+    // .set_noise(0.01)
+    .fit_kernel()
+    .fit_prior()
+    .train();
+    gp
 }
 
 impl<'a, R, Data> BayesianIterator<'a, R, Data>
@@ -89,22 +133,11 @@ where
     {
         let domains = Data::get_domains_ext();
 
-        let (training_inputs, training_outputs): (Vec<_>, Vec<_>) = evaluations
-            .map(|mut e| {
-                normalize_input(&mut e.input, &domains);
-                (e.input, e.output)
-            })
-            .unzip();
+        let (training_inputs, training_outputs): (Vec<_>, Vec<_>) =
+            evaluations.map(|e| (e.input, e.output)).unzip();
 
-        let gp = friedrich::gaussian_process::GaussianProcessBuilder::<
-            SquaredExp,
-            friedrich::prior::ConstantPrior,
-        >::new(training_inputs, training_outputs)
-        .set_cholesky_epsilon(Some(0.01f64.powi(2)))
-        .set_noise(0.01)
-        .fit_kernel()
-        .fit_prior()
-        .train();
+        let gp =
+            create_gaussian_process(training_inputs.clone(), &domains, training_outputs.clone());
 
         // if gp.noise < 0.1f64 {
         //     log::error!("Noise was {}. Setting it to 0.1", gp.noise);
@@ -137,23 +170,29 @@ where
             _phantom_data: PhantomData,
             buget_remaining: bayesian.buget,
             discrete_domains_index,
+            fit_model_after: bayesian.fit_model_after,
             domains,
             gp,
             input_interval,
-            k: bayesian.initial_k,
+            initial_k: bayesian.initial_k,
             runner,
-            nb_iterations: 100,
+            nb_iterations: 1000,
             last_guess: vec![f64::NAN],
+            inputs: training_inputs,
+            outputs: training_outputs,
+            current_iteration: 1,
         }
     }
 
     fn get_next_guess(&mut self) -> Option<Box<[f64]>> {
         let mut retries = 0;
+        let n = self.inputs.len() as f64;
+        let sqrt_n = n.sqrt();
         let result = loop {
             let minim_function = |input: &[f64]| {
                 minimize_function(
                     &self.gp,
-                    self.k,
+                    self.initial_k * sqrt_n,
                     &self.domains,
                     self.discrete_domains_index.iter().cloned(),
                     &mut input.to_vec(),
@@ -161,7 +200,24 @@ where
                 )
             };
 
-            let (value, next_guess) = simplers_optimization::Optimizer::minimize(
+            // println!("{}: {:?}", self.inputs.len(), self.inputs);
+            // let mut i = -2.;
+            // print!("x=[");
+            // while i <= 10. {
+            //     print!("{},", i);
+
+            //     i += 0.1;
+            // }
+            // println!("]");
+            // let mut i = -2.;
+            // print!("y=[");
+            // while i <= 10. {
+            //     print!("{},", minim_function(&vec![i]));
+
+            //     i += 0.1;
+            // }
+            // println!("]");
+            let (_value, next_guess) = simplers_optimization::Optimizer::minimize(
                 &minim_function,
                 &self.input_interval,
                 self.nb_iterations,
@@ -170,27 +226,28 @@ where
                 .last_guess
                 .iter()
                 .zip(next_guess.iter())
-                .all(|(x, y)| (x - y).abs() < 0.000001)
+                .all(|(x, y)| (x - y).abs() < 0.00000001)
             {
+                self.initial_k *= 1.5;
                 log::warn!(
-                    "Last guess identical to this guess. make k larger by 1.5. {:?}, {:?}",
+                    "Last guess identical to this guess. make k larger by 1.5. {:?}, {:?}. New k: {}",
                     self.last_guess,
-                    next_guess
+                    next_guess,
+                    self.initial_k
                 );
-                self.k *= 1.5;
                 retries += 1;
-                if retries < 3 {
+                if retries < 8 {
                     continue;
                 }
-                log::warn!("Retried for 3 times. Quiting");
+                log::warn!("Retried for 8 times. Quiting");
                 self.buget_remaining = 0;
                 return None;
             }
             self.last_guess = next_guess.to_vec();
             break next_guess;
         };
-        self.gp
-            .fit_parameters(true, true, 100, 0.01, Duration::from_secs(1));
+        // self.gp
+        //     .fit_parameters(true, true, 100, 0.01, Duration::from_secs(10));
 
         Some(result)
     }
@@ -221,10 +278,25 @@ where
         let input_deserialized = Data::from_values(input.iter().cloned());
         let real_output = self.runner.run(input_deserialized);
 
-        log::info!("Adding sample");
-        self.gp.add_samples(&next_guess, &real_output);
         self.buget_remaining -= 1;
-        // gp.fit_parameters(true, false, 200, 0.05, Duration::from_secs(60));
+        self.outputs.push(real_output);
+        if self
+            .fit_model_after
+            .map(|v| self.current_iteration % v == 0)
+            .unwrap_or(false)
+        {
+            self.inputs.push(next_guess);
+            self.gp =
+                create_gaussian_process(self.inputs.clone(), &self.domains, self.outputs.clone());
+        } else {
+            self.gp.add_samples(&next_guess, &real_output);
+            self.gp
+                .fit_parameters(true, true, 1000, 0.01, Duration::from_secs(10));
+            self.inputs.push(next_guess);
+        }
+
+        // self.gp
+        //     .fit_parameters(true, true, 200, 0.05, Duration::from_secs(10));
         // if gp.noise.is_nan() {
         //     log::error!("Noise was Nan. Fixing this!");
         //     gp.noise = 0.01;
@@ -237,6 +309,7 @@ where
         //     gp.cholesky_epsilon
         // );
         // log::warn!("gp at 0,0: {}", gp.predict(&vec![2f64, 3f64]));
+        self.current_iteration += 1;
         Some((input, real_output))
     }
 }

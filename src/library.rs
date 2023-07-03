@@ -106,7 +106,7 @@ impl Domain {
     }
 }
 
-pub trait InputData: Clone {
+pub trait InputData {
     fn from_deserializer<T: Iterator<Item = Value>>(deserializer: InputDeserializer<T>) -> Self;
     fn get_domains(domains: DomainBuilder) -> DomainBuilder;
 }

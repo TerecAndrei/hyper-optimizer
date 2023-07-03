@@ -20,7 +20,7 @@ impl<R: InputRunner<Data>, Data: InputData> Optimizer<R, Data> {
 
     pub fn optimize<Minimizer: RunnerMinimizer<R, Data>, SaveFn: SaveTrait>(
         &self,
-        config: &mut Config<SaveFn>,
+        mut config: Config<SaveFn>,
         minimizer: &Minimizer,
     ) -> OptimizerResult<Data> {
         let (domains, names) = Data::get_domains_and_names();
@@ -69,7 +69,7 @@ impl<R: InputRunner<Data>, Data: InputData> Optimizer<R, Data> {
         let mut count = 0;
         for (index, (data, result)) in iter.enumerate() {
             count = index;
-            log::info!("Function evaluated {}/{}", index + 1, size);
+            log::debug!("Function evaluated {}/{}", index + 1, size);
             if config
                 .save_interval
                 .map(|interval| (index as u32 + 1) % interval == 0)
