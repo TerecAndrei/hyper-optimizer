@@ -34,8 +34,6 @@ where
     where
         IE: Iterator<Item = Evaluation> + Clone + 'a,
     {
-        // let domains = Data::get_domains_ext();
-
         let iterator = self.points.iter().map(move |data| {
             let output = runner.run(Data::from_values(data.iter().cloned()));
             (data.clone(), output)

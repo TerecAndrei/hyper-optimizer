@@ -246,7 +246,7 @@ impl<'a, Runner: InputRunner<Data>, Data: InputData, R: Rng + Clone, Fitness: Fi
         let fitness_scores = self.population.iter().map(|e| {
             self.config
                 .fitness_function
-                .transform_objective(e.output.unwrap()) as f32
+                .transform_objective(e.output.unwrap())
         });
 
         let elitism = self
