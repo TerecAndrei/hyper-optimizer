@@ -169,7 +169,6 @@ where
                     .iter()
                     .map(|d| d.random_value(&mut rng))
                     .collect::<Vec<_>>();
-                // let output = runner.run(Data::from_values(data.iter().cloned()));
                 GeneticEvaluation {
                     input: data,
                     output: None,

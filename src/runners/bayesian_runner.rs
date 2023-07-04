@@ -114,8 +114,7 @@ fn create_gaussian_process(
         SquaredExp,
         friedrich::prior::ConstantPrior,
     >::new(inputs, outputs)
-    // .set_cholesky_epsilon(Some(0.01f64.powi(2)))
-    // .set_noise(0.01)
+    .set_cholesky_epsilon(Some(0.01f64))
     .fit_kernel()
     .fit_prior()
     .train();
@@ -138,13 +137,6 @@ where
 
         let gp =
             create_gaussian_process(training_inputs.clone(), &domains, training_outputs.clone());
-
-        // if gp.noise < 0.1f64 {
-        //     log::error!("Noise was {}. Setting it to 0.1", gp.noise);
-        //     gp.noise = 0.01;
-        //     gp.cholesky_epsilon = Some(0.01f64.powi(2));
-        // }
-        // log::error!("noise={}", gp.noise);
 
         let input_interval = domains
             .iter()
@@ -200,23 +192,6 @@ where
                 )
             };
 
-            // println!("{}: {:?}", self.inputs.len(), self.inputs);
-            // let mut i = -2.;
-            // print!("x=[");
-            // while i <= 10. {
-            //     print!("{},", i);
-
-            //     i += 0.1;
-            // }
-            // println!("]");
-            // let mut i = -2.;
-            // print!("y=[");
-            // while i <= 10. {
-            //     print!("{},", minim_function(&vec![i]));
-
-            //     i += 0.1;
-            // }
-            // println!("]");
             let (_value, next_guess) = simplers_optimization::Optimizer::minimize(
                 &minim_function,
                 &self.input_interval,
@@ -236,18 +211,24 @@ where
                     self.initial_k
                 );
                 retries += 1;
-                if retries < 8 {
+                if retries < 3 {
                     continue;
                 }
-                log::warn!("Retried for 8 times. Quiting");
+                if retries == 3 {
+                    self.gp = create_gaussian_process(
+                        self.inputs.clone(),
+                        &self.domains,
+                        self.outputs.clone(),
+                    );
+                    continue;
+                }
+                log::warn!("Retried for 4 times. Quiting");
                 self.buget_remaining = 0;
                 return None;
             }
             self.last_guess = next_guess.to_vec();
             break next_guess;
         };
-        // self.gp
-        //     .fit_parameters(true, true, 100, 0.01, Duration::from_secs(10));
 
         Some(result)
     }
@@ -295,20 +276,6 @@ where
             self.inputs.push(next_guess);
         }
 
-        // self.gp
-        //     .fit_parameters(true, true, 200, 0.05, Duration::from_secs(10));
-        // if gp.noise.is_nan() {
-        //     log::error!("Noise was Nan. Fixing this!");
-        //     gp.noise = 0.01;
-        // }
-        // gp.cholesky_epsilon = Some(gp.noise.powi(2));
-        // log::info!(
-        //     "Likelyhood: {} and noise {} and cholesky {:?}",
-        //     gp.likelihood(),
-        //     gp.noise,
-        //     gp.cholesky_epsilon
-        // );
-        // log::warn!("gp at 0,0: {}", gp.predict(&vec![2f64, 3f64]));
         self.current_iteration += 1;
         Some((input, real_output))
     }
@@ -319,12 +286,11 @@ fn is_integer(value: f64) -> bool {
     (value.round() - value).abs() < 0.00001
 }
 
-fn normalize_input(inputs: &mut Vec<f64>, domains: &[Domain]) {
+fn normalize_input(inputs: &mut [f64], domains: &[Domain]) {
     for (input, domain) in inputs.iter_mut().zip(domains.iter()) {
         let range = domain.range();
         let size = range.end - range.start;
         *input = (*input - range.start) / size;
-        assert!(0. <= *input && *input <= 1.);
     }
 }
 

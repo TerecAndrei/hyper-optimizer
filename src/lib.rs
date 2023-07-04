@@ -5,3 +5,4 @@ pub mod runner;
 pub use hyper_optimizer_derive as derive;
 pub mod output;
 pub mod runners;
+pub use anyhow;

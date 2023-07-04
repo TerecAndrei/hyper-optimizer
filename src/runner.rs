@@ -22,7 +22,7 @@ impl<R: InputRunner<Data>, Data: InputData> Optimizer<R, Data> {
         &self,
         mut config: Config<SaveFn>,
         minimizer: &Minimizer,
-    ) -> OptimizerResult<Data> {
+    ) -> anyhow::Result<OptimizerResult<Data>> {
         let (domains, names) = Data::get_domains_and_names();
         if let Some(ref last_stats) = config.last_evaluations {
             if domains.len() != last_stats.domains.len() {
@@ -75,7 +75,7 @@ impl<R: InputRunner<Data>, Data: InputData> Optimizer<R, Data> {
                 .map(|interval| (index as u32 + 1) % interval == 0)
                 .unwrap_or(false)
             {
-                config.save_fn.save(&stats, index);
+                config.save_fn.save(&stats, index)?;
             }
             stats.evaluations.push(Evaluation {
                 input: data.into_iter().map(|v| v.to_f64()).collect(),
@@ -83,11 +83,11 @@ impl<R: InputRunner<Data>, Data: InputData> Optimizer<R, Data> {
             });
         }
         let (best_input, best_output) = stats.best::<Data>().unwrap();
-        config.save_fn.save(&stats, count + 1);
-        OptimizerResult {
+        config.save_fn.save(&stats, count + 1)?;
+        Ok(OptimizerResult {
             best_input,
             best_output,
             stats,
-        }
+        })
     }
 }

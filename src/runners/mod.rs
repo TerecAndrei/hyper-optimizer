@@ -4,7 +4,6 @@ pub mod fixed_runner;
 pub mod genetic_runner;
 pub mod grid_runner;
 pub mod random_runner;
-
 use std::{fs::File, path::Path};
 
 use crate::{
@@ -59,14 +58,14 @@ where
 }
 
 pub trait SaveTrait {
-    fn save(&mut self, stats: &OutputStats, iteration: usize);
+    fn save(&mut self, stats: &OutputStats, iteration: usize) -> anyhow::Result<()>;
 }
 
 impl<Function> SaveTrait for Function
 where
-    Function: FnMut(&OutputStats, usize),
+    Function: FnMut(&OutputStats, usize) -> anyhow::Result<()>,
 {
-    fn save(&mut self, stats: &OutputStats, iteration: usize) {
+    fn save(&mut self, stats: &OutputStats, iteration: usize) -> anyhow::Result<()> {
         self(stats, iteration)
     }
 }
@@ -85,7 +84,9 @@ where
 pub struct EmptySave;
 
 impl SaveTrait for EmptySave {
-    fn save(&mut self, _stats: &OutputStats, _iteration: usize) {}
+    fn save(&mut self, _stats: &OutputStats, _iteration: usize) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 pub struct SaveToFile<P: AsRef<Path>> {
@@ -93,7 +94,7 @@ pub struct SaveToFile<P: AsRef<Path>> {
 }
 
 impl<P: AsRef<Path>> SaveTrait for SaveToFile<P> {
-    fn save(&mut self, stats: &OutputStats, _iteration: usize) {
+    fn save(&mut self, stats: &OutputStats, _iteration: usize) -> anyhow::Result<()> {
         stats.write_to_file(self.path.as_ref())
     }
 }
@@ -171,19 +172,19 @@ impl<SafeFn: SaveTrait> ConfigBuilder<SafeFn> {
         }
     }
 
-    pub fn build(self) -> Config<SafeFn> {
+    pub fn build(self) -> anyhow::Result<Config<SafeFn>> {
         let mut prior_evaluations = self.prior_evaluations;
         if let Some(path) = self.read_evaluations_from {
-            let file = File::open(path).unwrap();
-            prior_evaluations = Some(serde_json::from_reader(file).unwrap());
+            let file = File::open(path)?;
+            prior_evaluations = Some(serde_json::from_reader(file)?);
         }
-        Config {
+        Ok(Config {
             save_interval: self.save_interval,
             last_evaluations: prior_evaluations,
             allow_different_domains: self.allow_different_domains,
             allow_different_names: self.allow_different_names,
             save_fn: self.save_fn,
-        }
+        })
     }
 }
 

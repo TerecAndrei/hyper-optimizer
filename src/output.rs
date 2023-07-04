@@ -7,7 +7,6 @@ use crate::library::{Domain, InputData, InputDataExt};
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputStats {
-    // pub method_type: MethodType,
     pub domains: Vec<Domain>,
     pub field_names: Vec<String>,
     pub evaluations: Vec<Evaluation>,
@@ -21,20 +20,20 @@ impl OutputStats {
             .map(|e| (Data::from_f64(e.input.iter().cloned()), e.output))
     }
 
-    pub fn read_from_file<P: AsRef<Path>>(path: P) -> OutputStats {
-        let file = File::open(path).unwrap();
+    pub fn read_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<OutputStats> {
+        let file = File::open(path)?;
 
-        serde_json::from_reader(file).unwrap()
+        Ok(serde_json::from_reader(file)?)
     }
 
-    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) {
+    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> anyhow::Result<()> {
         let writer = File::options()
             .write(true)
             .truncate(true)
             .create(true)
-            .open(path)
-            .unwrap();
-        serde_json::to_writer_pretty(writer, self).unwrap();
+            .open(path)?;
+        serde_json::to_writer_pretty(writer, self)?;
+        Ok(())
     }
 }
 
